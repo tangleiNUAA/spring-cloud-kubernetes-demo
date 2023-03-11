@@ -1,0 +1,3 @@
+# 用于验证 config
+config:
+  demo: fromCode

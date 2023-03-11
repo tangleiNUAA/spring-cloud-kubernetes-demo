@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spring-cloud-kubernetes-demo
+data:
+  application.yml: |-
+    config:
+      demo: configMapConfig-change
+

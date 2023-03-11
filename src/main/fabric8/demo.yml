@@ -1,0 +1,69 @@
+---
+# <xxx> 代表某个变量, 通过注释描述
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cloud-kubernetes-demo
+    group: org.vidi
+  name: cloud-kubernetes-demo
+
+spec:
+  selector:
+    matchLabels:
+      app: cloud-kubernetes-demo
+      group: org.vidi
+  template:
+    metadata:
+      labels:
+        app: cloud-kubernetes-demo
+        group: org.vidi
+    spec:
+      containers:
+        - env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: development
+          name: cloud-kubernetes-demo
+          image: vidi/spring-cloud-kubernetes-demo:0.0.1
+          imagePullPolicy: IfNotPresent
+          # 一般来说创建镜像会在启动指令中放一个 JAVA_OPS 环境变量, 看了众和环境里面的 Dockerfile, 是这个启动指令，就在这个基础上调整的
+          # app_id 为
+          # app_name 为
+          # pinpoint_agent_container_path 为 pinpoint 挂载路径
+          # pinpoint_agent_zip_or_jar_file 为 pinpoint-agent 可执行包
+          # <pinpoint_agent_container_path>/<pinpoint_agent_jar_file> 为 pinpoint-agent[-version].jar 文件 path
+          # 增加 -javaagent <pinpoint_agent_container_path>/<pinpoint_agent_jar_file>  -Dpinpoint.agentId=<app_id> -Dpinpoint.applicationName=<app_name>
+          # pinpoint 还有个启动参数 pinpoint.container 需要看客户是否提供，如果只有前两个参数，可忽略，如果客户对定位到应用有做增强，就需要这个参数，一般来说不用也可以, -Dpinpoint.container=<container>
+          # command:  ["java","-server","-Xmx2048m","-Xms2048m","-Xss256k","-XX:-HeapDumpOnOutOfMemoryError","-XX:HeapDumpPath=/mnt/log/oom_dump.log","-XX:+UseG1GC","-Dlog4j2.formatMsgNoLookups=true","-Xbootclasspath/a:./config/","-Djava.security.egd=file:/dev/./urandom","-jar","app.jar","--spring.profiles.active=dev"]
+          command:  ["java", "-agent:<pinpoint_agent_container_path>/<pinpoint_agent_jar_file>", '-Dpinpoint.agentId=<app_id>', "-Dpinpoint.applicationName=<app_name>","-server","-Xmx2048m","-Xms2048m","-Xss256k","-XX:-HeapDumpOnOutOfMemoryError","-XX:HeapDumpPath=/mnt/log/oom_dump.log","-XX:+UseG1GC","-Dlog4j2.formatMsgNoLookups=true","-Xbootclasspath/a:./config/","-Djava.security.egd=file:/dev/./urandom","-jar","app.jar","--spring.profiles.active=dev"]
+          # readiness 和 liveness 可忽略, 这里是我本地测试项目的 actuator 不完全一致，使用共享的 readiness 和 liveness
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              port: 8080
+              path: /actuator/health/liveness
+              scheme: HTTP
+            initialDelaySeconds: 100
+            successThreshold: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              port: 8080
+              path: /actuator/health/readiness
+              scheme: HTTP
+            initialDelaySeconds: 10
+            successThreshold: 1
+          # 端口映射
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          # 挂载 pinpoint PVC
+          volumeMounts:
+            # pinpoint_agent_container_path 为 pinpoint 挂载路径
+            - mountPath: <pinpoint_agent_container_path>  # 挂载路径
+              name: <pvc_name> # 配置了 pinpoint 的 PVC，需要客户提供, 如果没有, 可以在 Rancher 中配置, 客户提供 pinpoint-agent 资源文件
+          # 本地测试使用，与客户其他保持一致
+          securityContext:
+            privileged: false
+
